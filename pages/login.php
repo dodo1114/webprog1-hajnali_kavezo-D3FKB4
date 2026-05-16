@@ -3,11 +3,16 @@
 $loginErrors = [];
 $registerErrors = [];
 
-if (empty($_SESSION['captcha'])) {
+function refresh_captcha(): void
+{
     $_SESSION['captcha'] = [
         'a' => random_int(2, 9),
         'b' => random_int(2, 9),
     ];
+}
+
+if (empty($_SESSION['captcha'])) {
+    refresh_captcha();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -43,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (mb_strlen($familyName) < 2) $registerErrors[] = 'A családi név legalább 2 karakter legyen.';
         if (mb_strlen($givenName) < 2) $registerErrors[] = 'Az utónév legalább 2 karakter legyen.';
-        if (!preg_match('/^[a-zA-Z0-9_.-]{3,60}$/', $login)) $registerErrors[] = 'A login név 3-60 karakteres lehet, betűkkel, számokkal, ponttal, kötőjellel.';
+        if (!preg_match('/^[\p{L}\p{N}_. -]{3,60}$/u', $login)) $registerErrors[] = 'A login név 3-60 karakteres lehet betűkkel, számokkal, szóközzel, ponttal, aláhúzással vagy kötőjellel.';
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $registerErrors[] = 'Adj meg érvényes e-mail címet.';
         if (strlen($password) < 8) $registerErrors[] = 'A jelszó legalább 8 karakter legyen.';
         if ($password !== $passwordAgain) $registerErrors[] = 'A két jelszó nem egyezik.';
@@ -64,6 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('success', 'Sikeres regisztráció. Most már be tudsz jelentkezni.');
             redirect_to('belepes');
         }
+
+        refresh_captcha();
     }
 }
 ?>
@@ -116,6 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="field">
                 <label for="reg_login">Login név</label>
                 <input id="reg_login" name="reg_login" value="<?= h($_POST['reg_login'] ?? '') ?>">
+                <small>Használhatsz ékezetes betűket, számokat, szóközt, pontot, aláhúzást vagy kötőjelet.</small>
             </div>
             <div class="field">
                 <label for="reg_email">E-mail</label>
