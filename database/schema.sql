@@ -29,7 +29,7 @@ CREATE TABLE ar (
   id INT PRIMARY KEY,
   sutiid INT NOT NULL,
   ertek INT NOT NULL,
-  egyseg VARCHAR(60) NOT NULL,
+  egyseg VARCHAR(60) NULL,
   CONSTRAINT fk_ar_suti FOREIGN KEY (sutiid) REFERENCES suti(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_hungarian_ci;
 
