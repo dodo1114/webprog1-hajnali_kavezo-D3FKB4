@@ -350,6 +350,10 @@ th {
         text-align: left;
     }
 
+    .main-nav {
+        justify-content: flex-start;
+    }
+
     .promo-grid,
     .card-grid,
     .split,
@@ -361,4 +365,3 @@ th {
         min-height: 58vh;
     }
 }
-
