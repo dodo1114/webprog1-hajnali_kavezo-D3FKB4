@@ -3,6 +3,13 @@
 $loginErrors = [];
 $registerErrors = [];
 
+if (empty($_SESSION['captcha'])) {
+    $_SESSION['captcha'] = [
+        'a' => random_int(2, 9),
+        'b' => random_int(2, 9),
+    ];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $mode = $_POST['mode'] ?? '';
@@ -31,6 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = request_value('reg_email');
         $password = (string) ($_POST['reg_password'] ?? '');
         $passwordAgain = (string) ($_POST['reg_password_again'] ?? '');
+        $captchaAnswer = (int) ($_POST['captcha_answer'] ?? -1);
+        $expectedCaptcha = (int) $_SESSION['captcha']['a'] + (int) $_SESSION['captcha']['b'];
 
         if (mb_strlen($familyName) < 2) $registerErrors[] = 'A családi név legalább 2 karakter legyen.';
         if (mb_strlen($givenName) < 2) $registerErrors[] = 'Az utónév legalább 2 karakter legyen.';
@@ -38,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $registerErrors[] = 'Adj meg érvényes e-mail címet.';
         if (strlen($password) < 8) $registerErrors[] = 'A jelszó legalább 8 karakter legyen.';
         if ($password !== $passwordAgain) $registerErrors[] = 'A két jelszó nem egyezik.';
+        if ($captchaAnswer !== $expectedCaptcha) $registerErrors[] = 'A captcha eredménye nem helyes.';
 
         if (!$registerErrors) {
             $stmt = db()->prepare('SELECT COUNT(*) FROM users WHERE login = ? OR email = ?');
@@ -50,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$registerErrors) {
             $stmt = db()->prepare('INSERT INTO users (family_name, given_name, login, email, password_hash) VALUES (?, ?, ?, ?, ?)');
             $stmt->execute([$familyName, $givenName, $login, $email, password_hash($password, PASSWORD_DEFAULT)]);
+            unset($_SESSION['captcha']);
             flash('success', 'Sikeres regisztráció. Most már be tudsz jelentkezni.');
             redirect_to('belepes');
         }
@@ -118,10 +129,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label for="reg_password_again">Jelszó újra</label>
                 <input id="reg_password_again" name="reg_password_again" type="password">
             </div>
+            <div class="field full">
+                <label for="captcha_answer">Captcha: mennyi <?= h($_SESSION['captcha']['a']) ?> + <?= h($_SESSION['captcha']['b']) ?>?</label>
+                <input id="captcha_answer" name="captcha_answer" inputmode="numeric" value="">
+            </div>
             <div class="form-actions full">
                 <button class="primary" type="submit">Regisztráció</button>
             </div>
         </form>
     </div>
 </section>
-

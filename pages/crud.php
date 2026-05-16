@@ -3,9 +3,15 @@
 $errors = [];
 $editId = isset($_GET['edit']) ? (int) $_GET['edit'] : 0;
 $editing = null;
+$canModify = is_logged_in();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
+    if (!$canModify) {
+        flash('warning', 'A táblázat módosításához be kell jelentkezni.');
+        redirect_to('belepes');
+    }
+
     $action = $_POST['action'] ?? '';
 
     if ($action === 'delete') {
@@ -41,6 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+if ($editId > 0 && !$canModify) {
+    flash('warning', 'A szerkesztéshez be kell jelentkezni.');
+    redirect_to('belepes');
+}
+
 if ($editId > 0) {
     $stmt = db()->prepare('SELECT * FROM suti WHERE id = ?');
     $stmt->execute([$editId]);
@@ -65,37 +76,43 @@ $cakes = $stmt->fetchAll();
     <h1>Cukrászda adatbázis - sütemények</h1>
     <div class="split">
         <div class="form-panel">
-            <h2><?= $editing ? 'Sütemény módosítása' : 'Új sütemény' ?></h2>
-            <?php if ($errors): ?>
-                <div class="error-list">
-                    <?php foreach ($errors as $error): ?>
-                        <p><?= h($error) ?></p>
-                    <?php endforeach; ?>
-                </div>
+            <?php if ($canModify): ?>
+                <h2><?= $editing ? 'Sütemény módosítása' : 'Új sütemény' ?></h2>
+                <?php if ($errors): ?>
+                    <div class="error-list">
+                        <?php foreach ($errors as $error): ?>
+                            <p><?= h($error) ?></p>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <form method="post" class="form-grid">
+                    <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+                    <input type="hidden" name="action" value="save">
+                    <input type="hidden" name="id" value="<?= h($editing['id'] ?? 0) ?>">
+                    <div class="field full">
+                        <label for="nev">Név</label>
+                        <input id="nev" name="nev" value="<?= h($_POST['nev'] ?? ($editing['nev'] ?? '')) ?>">
+                    </div>
+                    <div class="field full">
+                        <label for="tipus">Típus</label>
+                        <input id="tipus" name="tipus" value="<?= h($_POST['tipus'] ?? ($editing['tipus'] ?? '')) ?>">
+                    </div>
+                    <label class="checkline field full">
+                        <input name="dijazott" type="checkbox" <?= (!empty($_POST['dijazott']) || (!$_POST && !empty($editing['dijazott']))) ? 'checked' : '' ?>>
+                        Díjazott sütemény
+                    </label>
+                    <div class="form-actions full">
+                        <button class="primary" type="submit"><?= $editing ? 'Módosítás' : 'Létrehozás' ?></button>
+                        <?php if ($editing): ?>
+                            <a class="button secondary" href="<?= h(route_url('crud')) ?>">Mégsem</a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            <?php else: ?>
+                <h2>Adatmódosítás</h2>
+                <p>A sütemények listája vendégként is megtekinthető, de létrehozást, módosítást és törlést csak bejelentkezett felhasználó végezhet.</p>
+                <a class="button primary" href="<?= h(route_url('belepes')) ?>">Bejelentkezés</a>
             <?php endif; ?>
-            <form method="post" class="form-grid">
-                <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
-                <input type="hidden" name="action" value="save">
-                <input type="hidden" name="id" value="<?= h($editing['id'] ?? 0) ?>">
-                <div class="field full">
-                    <label for="nev">Név</label>
-                    <input id="nev" name="nev" value="<?= h($_POST['nev'] ?? ($editing['nev'] ?? '')) ?>">
-                </div>
-                <div class="field full">
-                    <label for="tipus">Típus</label>
-                    <input id="tipus" name="tipus" value="<?= h($_POST['tipus'] ?? ($editing['tipus'] ?? '')) ?>">
-                </div>
-                <label class="checkline field full">
-                    <input name="dijazott" type="checkbox" <?= (!empty($_POST['dijazott']) || (!$_POST && !empty($editing['dijazott']))) ? 'checked' : '' ?>>
-                    Díjazott sütemény
-                </label>
-                <div class="form-actions full">
-                    <button class="primary" type="submit"><?= $editing ? 'Módosítás' : 'Létrehozás' ?></button>
-                    <?php if ($editing): ?>
-                        <a class="button secondary" href="<?= h(route_url('crud')) ?>">Mégsem</a>
-                    <?php endif; ?>
-                </div>
-            </form>
         </div>
 
         <div class="card">
@@ -117,7 +134,9 @@ $cakes = $stmt->fetchAll();
                 <th>Díjazott</th>
                 <th>Árak</th>
                 <th>Mentes jelölések</th>
-                <th>Műveletek</th>
+                <?php if ($canModify): ?>
+                    <th>Műveletek</th>
+                <?php endif; ?>
             </tr>
             </thead>
             <tbody>
@@ -129,21 +148,22 @@ $cakes = $stmt->fetchAll();
                     <td><?= $cake['dijazott'] ? 'Igen' : 'Nem' ?></td>
                     <td><?= h($cake['arak'] ?: '-') ?></td>
                     <td><?= h($cake['mentes'] ?: '-') ?></td>
-                    <td>
-                        <div class="actions">
-                            <a class="button secondary" href="<?= h(route_url('crud', ['edit' => $cake['id']])) ?>">Szerkesztés</a>
-                            <form method="post" onsubmit="return confirm('Biztosan törlöd?')">
-                                <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
-                                <input type="hidden" name="action" value="delete">
-                                <input type="hidden" name="id" value="<?= h($cake['id']) ?>">
-                                <button class="danger" type="submit">Törlés</button>
-                            </form>
-                        </div>
-                    </td>
+                    <?php if ($canModify): ?>
+                        <td>
+                            <div class="actions">
+                                <a class="button secondary" href="<?= h(route_url('crud', ['edit' => $cake['id']])) ?>">Szerkesztés</a>
+                                <form method="post" onsubmit="return confirm('Biztosan törlöd?')">
+                                    <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="id" value="<?= h($cake['id']) ?>">
+                                    <button class="danger" type="submit">Törlés</button>
+                                </form>
+                            </div>
+                        </td>
+                    <?php endif; ?>
                 </tr>
             <?php endforeach; ?>
             </tbody>
         </table>
     </div>
 </section>
-
